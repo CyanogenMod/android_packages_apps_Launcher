@@ -16,6 +16,9 @@
 
 package com.android.launcher;
 
+import org.adw.launcher.CustomScroller;
+import org.adw.launcher.ElasticInterpolator;
+
 import android.app.WallpaperManager;
 import android.content.Context;
 import android.content.Intent;
@@ -64,7 +67,7 @@ public class Workspace extends ViewGroup implements DropTarget, DragSource, Drag
 
     private int mCurrentScreen;
     private int mNextScreen = INVALID_SCREEN;
-    private Scroller mScroller;
+    private CustomScroller mScroller;
     private VelocityTracker mVelocityTracker;
 
     /**
@@ -151,7 +154,7 @@ public class Workspace extends ViewGroup implements DropTarget, DragSource, Drag
      * Initializes various states for this workspace.
      */
     private void initWorkspace() {
-        mScroller = new Scroller(getContext());
+        mScroller = new CustomScroller(getContext(), new ElasticInterpolator(5f));
         mCurrentScreen = mDefaultScreen;
         Launcher.setScreen(mCurrentScreen);
 
