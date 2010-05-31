@@ -21,11 +21,15 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.ComponentName;
 import android.content.res.TypedArray;
+import android.graphics.Bitmap;
 import android.graphics.Canvas;
+import android.graphics.Paint;
 import android.graphics.Rect;
 import android.graphics.Region;
+import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
 import android.util.AttributeSet;
+import android.view.Display;
 import android.view.MotionEvent;
 import android.view.VelocityTracker;
 import android.view.View;
@@ -104,6 +108,15 @@ public class Workspace extends ViewGroup implements DropTarget, DragSource, Drag
     final Rect mClipBounds = new Rect();
     int mDrawerContentHeight;
     int mDrawerContentWidth;
+
+    //ADW: port from donut wallpaper drawing
+    private Paint mPaint;
+    private Bitmap mWallpaper;
+    private int mWallpaperWidth;
+    private int mWallpaperHeight;
+    private float mWallpaperOffset;
+    private boolean mWallpaperLoaded;
+    private boolean lwpSupport=true;
 
     /**
      * Used to inflate the Workspace from XML.
@@ -399,12 +412,31 @@ public class Workspace extends ViewGroup implements DropTarget, DragSource, Drag
 
     @Override
     public boolean isOpaque() {
-        return false;
+        //ADW: hack to use old rendering
+        if(!lwpSupport && mWallpaperLoaded){
+            return !mWallpaper.hasAlpha();
+        }else{
+                return false;
+        }
     }
 
     @Override
     protected void dispatchDraw(Canvas canvas) {
         boolean restore = false;
+
+        //ADW: If using old wallpaper rendering method...
+        if(!lwpSupport && mWallpaper!=null){
+            float x = getScrollX() * mWallpaperOffset;
+            if (x + mWallpaperWidth < getRight() - getLeft()) {
+                x = getRight() - getLeft() - mWallpaperWidth;
+            }
+            //ADW: added tweaks for when scrolling "beyond bounce limits" :P
+            if (mScrollX<0)x=mScrollX;
+            if(mScrollX>getChildAt(getChildCount() - 1).getRight() - (mRight - mLeft)){
+                x=(mScrollX-mWallpaperWidth+(mRight-mLeft));
+            }
+            canvas.drawBitmap(mWallpaper, x, (mBottom - mWallpaperHeight) / 2, mPaint);
+        }
 
         // If the all apps drawer is open and the drawing region for the workspace
         // is contained within the drawer's bounds, we skip the drawing. This requires
@@ -476,6 +508,28 @@ public class Workspace extends ViewGroup implements DropTarget, DragSource, Drag
         final int count = getChildCount();
         for (int i = 0; i < count; i++) {
             getChildAt(i).measure(widthMeasureSpec, heightMeasureSpec);
+        }
+
+        //ADW: measure wallpaper when using old rendering
+        if(!lwpSupport){
+            if (mWallpaperLoaded) {
+                mWallpaperLoaded = false;
+
+                Display display = mLauncher.getWindowManager().getDefaultDisplay();
+                boolean isPortrait = display.getWidth() < display.getHeight();
+
+                final int _width = isPortrait ? display.getWidth() : display.getHeight();
+                final int _height = isPortrait ? display.getHeight() : display.getWidth();
+
+                mWallpaper = Utilities.centerToFit(mWallpaper, _width * Launcher.WALLPAPER_SCREENS_SPAN,
+                        _height, mLauncher);
+                mWallpaperWidth = mWallpaper.getWidth();
+                mWallpaperHeight = mWallpaper.getHeight();
+            }
+
+            final int wallpaperWidth = mWallpaperWidth;
+            mWallpaperOffset = wallpaperWidth > width ? (count * width - wallpaperWidth) /
+                    ((count - 1) * (float) width) : 1.0f;
         }
 
         if (mFirstLayout) {
@@ -1250,6 +1304,30 @@ public class Workspace extends ViewGroup implements DropTarget, DragSource, Drag
     void moveToDefaultScreen() {
         snapToScreen(mDefaultScreen);
         getChildAt(mDefaultScreen).requestFocus();
+    }
+
+    /**
+     * ADW: Make a local copy of wallpaper bitmap to use instead wallpapermanager
+     * only when detected not being a Live Wallpaper
+     */
+    public void setWallpaper(){
+        if(mWallpaperManager.getWallpaperInfo()!=null){
+            if(mWallpaper!=null){
+                mWallpaper.recycle();
+                mWallpaperLoaded=false;
+            }
+            lwpSupport=true;
+        }else{
+            final Drawable drawable = mWallpaperManager.getDrawable();
+            if (drawable instanceof BitmapDrawable) {
+                mWallpaper=Bitmap.createBitmap(((BitmapDrawable) drawable).getBitmap());
+                mWallpaperLoaded=true;
+            }
+            lwpSupport=false;
+        }
+        mLauncher.setWindowBackground(lwpSupport);
+        invalidate();
+        requestLayout();
     }
 
     public static class SavedState extends BaseSavedState {

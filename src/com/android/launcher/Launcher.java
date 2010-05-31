@@ -18,6 +18,7 @@ package com.android.launcher;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.app.Application;
 import android.app.Dialog;
 import android.app.ISearchManager;
 import android.app.SearchManager;
@@ -42,6 +43,7 @@ import android.content.res.Resources;
 import android.database.ContentObserver;
 import android.graphics.Bitmap;
 import android.graphics.Rect;
+import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.TransitionDrawable;
 import android.os.Bundle;
@@ -201,6 +203,11 @@ public final class Launcher extends Activity implements View.OnClickListener, On
     private Bundle mSavedInstanceState;
 
     private DesktopBinder mBinder;
+
+    /**
+     * ADW:Wallpaper intent receiver
+     */
+    private static WallpaperIntentReceiver sWallpaperReceiver;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -1353,6 +1360,17 @@ public final class Launcher extends Activity implements View.OnClickListener, On
      * wallpaper.
      */
     private void registerIntentReceivers() {
+        if (sWallpaperReceiver == null) {
+            final Application application = getApplication();
+
+            sWallpaperReceiver = new WallpaperIntentReceiver(application, this);
+
+            IntentFilter filter = new IntentFilter(Intent.ACTION_WALLPAPER_CHANGED);
+            application.registerReceiver(sWallpaperReceiver, filter);
+        } else {
+            sWallpaperReceiver.setLauncher(this);
+        }
+
         IntentFilter filter = new IntentFilter(Intent.ACTION_PACKAGE_ADDED);
         filter.addAction(Intent.ACTION_PACKAGE_REMOVED);
         filter.addAction(Intent.ACTION_PACKAGE_CHANGED);
@@ -2294,4 +2312,39 @@ public final class Launcher extends Activity implements View.OnClickListener, On
             }
         }
     }
+    
+    /**
+     * ADW: wallpaper intent receiver for proper trackicng of wallpaper changes 
+     */
+    private static class WallpaperIntentReceiver extends BroadcastReceiver {
+        private WeakReference<Launcher> mLauncher;
+        WallpaperIntentReceiver(Application application, Launcher launcher) {
+            setLauncher(launcher);
+        }
+        void setLauncher(Launcher launcher) {
+            mLauncher = new WeakReference<Launcher>(launcher);
+        }
+        public void onReceive(Context context, Intent intent) {
+            if (mLauncher != null) {
+                final Launcher launcher = mLauncher.get();
+                if (launcher != null) {
+                        final Workspace workspace=launcher.getWorkspace();
+                    if(workspace!=null){
+                        workspace.setWallpaper();
+                    }
+                }
+            }
+        }
+    }
+    
+    public void setWindowBackground(boolean lwp){
+        if(!lwp){
+                getWindow().setBackgroundDrawable(new ColorDrawable(0xFF000000));
+        }else{
+                getWindow().setBackgroundDrawable(new ColorDrawable(0));
+        }
+
+    }
+
+
 }
