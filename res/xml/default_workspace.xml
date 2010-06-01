@@ -25,7 +25,7 @@
         launcher:y="3" />
 
      <favorite
-        launcher:packageName="com.android.gallery"
+        launcher:packageName="com.android.camera"
         launcher:className="com.android.camera.GalleryPicker"
         launcher:screen="1"
         launcher:x="2"
